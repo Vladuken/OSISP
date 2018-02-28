@@ -9,20 +9,31 @@ dir2=$2
 checked=0
 for var1 in $(find $dir1 -type f)
 do
-	echo $var1
-	for var2 in $(find $dir2 -type f)
-	do
-		if (diff -q $var1 $var2)
-		then
-			echo  $var1 = $var2 
-			let "checked=checked + 1"
-		fi
-	done
+	if [ -f "$var1" ]
+	then
+		echo $var1
+		for var2 in $(find $dir2 -type f)
+		do
+			if [ -f "$var2" ]
+			then
+				if (diff -q $var1 $var2)
+				then
+					echo  $var1 = $var2 
+					let "checked=checked + 1"
+				fi
+			fi
+		done
+	fi
 done 
 
-find $dir1 $dir2 -type f | wc -l 
-) 2>errors.txt | grep =
+ 
+) 2>/tmp/errors.txt | grep =
 
+
+sed -i "s/^/$(basename $0:" ")/g"  /tmp/errors.txt
+#cat /tmp/errors.txt
+
+echo $(find $dir1 $dir2 -type f | wc -l)
  
 
 
