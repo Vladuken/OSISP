@@ -2,12 +2,12 @@
 
 dir1=$1
 dir2=$2
-num=$(find $dir1 $dir2 -type f| wc -l)
+num=$(find $dir1 $dir2 -type f 2>/dev/null | wc -l)
 (
 
 
 #count number of equall files
-checked=0
+#checked=0
 
 IFS=$'\n'
 
@@ -16,17 +16,16 @@ set2=$(find $dir2 -type f)
 
 #num=${set1}${set2}
 
-echo $num
 
 
 for var1 in $set1
 do
 	if [ -f "$var1" ]
 	then
-		echo $var1
+		#echo $var1
 		for var2 in $set2
 		do
-			#if [ "$(stat -c$s "$var1")" == "$(stat -c$s "$var2")" ]
+			#if [ "$var1" != "$var2" ]
 			#then
 
 				if [ -f "$var2" ]
@@ -34,7 +33,7 @@ do
 					if (diff -q $var1 $var2)
 					then
 						echo  $var1 = $var2 
-						let "checked=checked + 1"
+						#let "checked=checked + 1"
 					fi
 				fi			
 	
