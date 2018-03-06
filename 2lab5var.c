@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <time.h>
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -10,49 +8,50 @@
 
 #define NUM 1000
 #define NAMESIZE 1000
+
 typedef struct {
     int countfiles;
     char name[NAMESIZE];
-
     long int sumsize;
     long int maxsize;
     char max_file_name[NAMESIZE];
-}dir_struct;
+}direction_info;
+
 
 void show_dir_content(char *path);
 long get_file_info (char *filepath);
-dir_struct get_dir_info(char *path, int index, dir_struct *darr);
-
+direction_info get_dir_info(char *path, int index, direction_info *direction_info_array);
 
 int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
-        printf("%s %s",argv[0],"[dir] [output file]\n");
+        printf("%s %s",argv[0],"[direction] [output file]\n");
         fflush(stdout);
     }
 
     //try to open directory
-    //printf("%d\n",get_file_info(argv[1]));
+    //printf("%dir_pointer\n",get_file_info(argv[1]));
 
-    DIR *d;
-    if ((d = opendir(argv[1])) == NULL)
+    
+    DIR *dir_pointer;
+    if ((dir_pointer = opendir(argv[1])) == NULL)
     {
         printf("Usage: %s [directory]\n",argv[0]);
 
         return 1;
     }
     printf("\n\n\n");
-    closedir(d);
+    closedir(dir_pointer);
 
     int index = 0;
-    dir_struct darr[NUM];
-    darr[index] = get_dir_info(argv[1],index,darr);
+    direction_info direction_info_array[NUM];
+    direction_info_array[index] = get_dir_info(argv[1],index,direction_info_array);
 
     int i=0;
-    while(darr[i].name[0])
+    while(direction_info_array[i].name[0])
     {
-        printf("Name: %s\n\n Num of files :%d\n Dir size: %ld\n Max: %s\n Maxsize: %ld\n\n\n\n",darr[i].name,darr[i].countfiles,darr[i].sumsize,darr[i].max_file_name,darr[i].maxsize);
+        printf("Name: %s\n\n Num of files :%dir_pointer\n Dir size: %ld\n Max: %s\n Maxsize: %ld\n\n\n\n",direction_info_array[i].name,direction_info_array[i].countfiles,direction_info_array[i].sumsize,direction_info_array[i].max_file_name,direction_info_array[i].maxsize);
         i++;
     }
 
@@ -75,92 +74,91 @@ int main(int argc, char *argv[])
 
 void show_dir_content(char *path)
 {
-    DIR *d = opendir(path);
-    if (d == NULL) return;
+    DIR *dir_pointer = opendir(path);
+    if (dir_pointer == NULL) return;
 
 
 
-    struct dirent *dir;
-    while (dir = readdir(d))
+    struct dirent *direction;
+    while (direction = readdir(dir_pointer))
     {
-        if ((dir->d_type == DT_DIR) && (strcmp(dir->d_name,".")!=0) && (strcmp(dir->d_name,"..")!=0))
+
+        
+        if ((direction->d_type == DT_DIR) && (strcmp(direction->d_name,".")!=0) && (strcmp(direction->d_name,"..")!=0))
         {
 
 
-            char dpath[NAMESIZE];
-            sprintf(dpath,"%s/%s",path,dir->d_name);
-            printf("%s%s/\n",GREEN,dpath);
-            show_dir_content(dpath);
+            char dir_path[NAMESIZE];
+            sprintf(dir_path,"%s/%s",path,direction->d_name);
+            printf("%s%s/\n",GREEN,dir_path);
+            show_dir_content(dir_path);
 
 
         }
-        else if (dir->d_type ==DT_REG)
+        else if (direction->d_type ==DT_REG)
         {
-            printf("%s%s/%s\n",BLUE,path,dir->d_name);
+            printf("%s%s/%s\n",BLUE,path,direction->d_name);
         }
     }
-    closedir(d);
+    closedir(dir_pointer);
 }
 
 //
-dir_struct get_dir_info(char *path, int index, dir_struct *darr)
+direction_info get_dir_info(char *path, int index, direction_info *direction_info_array)
 {
 
-    DIR *d = opendir(path);
-    if (d==NULL)
+    DIR *dir_pointer = opendir(path);
+
+    if (dir_pointer==NULL)
     {
         printf("ERROR\n");
     }
-    //if (d == NULL) return 1;
 
-    //dir_struct *dir_info;
-    struct dirent *dir;
+    //if (dir_pointer == NULL) return 1;
 
-    dir_struct *buff = (dir_struct *)malloc(sizeof(dir_struct));
+    //direction_info *dir_info;
+    struct dirent *direction;
+
+
+    direction_info *buff = (direction_info *)malloc(sizeof(direction_info));
     buff->sumsize = 0;
     buff->countfiles = 0;
     buff->maxsize = 0;
 
-
-    while (dir = readdir(d))
+    while (direction = readdir(dir_pointer))
     {
 
         //if its directory
-        if ((dir->d_type == DT_DIR) && ((dir->d_name[0]!='.') || ((dir->d_name[0]!='.') && (dir->d_name[1]!='.'))))
+        if ((direction->d_type == DT_DIR) && ((direction->d_name[0]!='.') || ((direction->d_name[0]!='.') && (direction->d_name[1]!='.'))))
         {
-              //printf("%s\n",dir->d_name);
-              char dpath[NAMESIZE];
-              sprintf(dpath,"%s/%s",path,dir->d_name);
-              strcpy(buff->name,dpath);
+              //printf("%s\n",direction->d_name);
+              char dir_path[NAMESIZE];
+              sprintf(dir_path,"%s/%s",path,direction->d_name);
+              strcpy(buff->name,dir_path);
 //            for(int i = 0; i < 256; i++)
 //            {
-//                (buff->name)[i]=dpath[i];
+//                (buff->name)[i]=dir_path[i];
 //            }
             index++;
-            darr[index] = get_dir_info(dpath,index,darr);
+            direction_info_array[index] = get_dir_info(dir_path,index,direction_info_array);
         }
-        else if (dir->d_type == DT_REG) //if it is file
+        else if (direction->d_type == DT_REG) //if it is file
         {
-            char fpath[NAMESIZE];
-            sprintf(fpath,"%s/%s",path,dir->d_name);
-            long buffsize = get_file_info(fpath);
+            char file_path[NAMESIZE];
+            sprintf(file_path,"%s/%s",path,direction->d_name);
+            long buffsize = get_file_info(file_path);
 
 
 
             if (buffsize >= buff->maxsize)
             {
                 buff->maxsize = buffsize;
-                strcpy(buff->max_file_name,fpath);
+                strcpy(buff->max_file_name,file_path);
             }
-
-
-
-
 
             (buff->countfiles)++;
             (buff->sumsize)+=buffsize;
-
-
+            
         }
         else
         {
@@ -175,7 +173,7 @@ dir_struct get_dir_info(char *path, int index, dir_struct *darr)
 
     strcpy(buff->name,path);
     fflush(stdout);
-    closedir(d);
+    closedir(dir_pointer);
     return *buff;
 }
 
@@ -186,7 +184,7 @@ long get_file_info (char * filepath)
     struct stat *filestat = malloc(sizeof(struct stat));
 
     stat(filepath,filestat);
-    //printf("%d\n",filestat->st_size);
+    //printf("%dir_pointer\n",filestat->st_size);
     return filestat->st_size;
 }
 
