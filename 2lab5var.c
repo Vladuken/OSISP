@@ -5,9 +5,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <libgen.h>
+#include <errno.h>
 
 #define NUM 1000
 #define NAMESIZE 1000
+#define ERR_LOG_PATH "/tmp/err.log"
 
 typedef struct {
     int countfiles;
@@ -24,25 +27,35 @@ direction_info get_dir_info(char *path, int index, direction_info *direction_inf
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+
+    char *program_name = basename(argv[0]);
+
+    FILE *err_log = NULL;
+    if ((err_log = fopen(ERR_LOG_PATH ,"w+")) == NULL)
     {
-        printf("%s %s",argv[0],"[direction] [output file]\n");
-        fflush(stdout);
+        fprintf(stderr, "%s: Unable create error log (%s)\n", program_name, ERR_LOG_PATH);
+        return 1;
     }
 
-    //try to open directory
-    //printf("%dir_pointer\n",get_file_info(argv[1]));
+    if (argc != 2)
+    {
+        save_error_to_log(err_log, program_name, "Wrong number of parameters. Usage:", "./lab2.exe \"path_name\"");
+        print_error_log(err_log);
+        return 1;
+    }
 
-    
+
+    //try to open directory
     DIR *dir_pointer;
     if ((dir_pointer = opendir(argv[1])) == NULL)
     {
-        printf("Usage: %s [directory]\n",argv[0]);
-
+        save_error_to_log(err_log, program_name,argv[1],strerror(errno));
+        print_error_log(err_log);
         return 1;
     }
     printf("\n\n\n");
     closedir(dir_pointer);
+
 
     int index = 0;
     direction_info direction_info_array[NUM];
@@ -51,16 +64,13 @@ int main(int argc, char *argv[])
     int i=0;
     while(direction_info_array[i].name[0])
     {
-        printf("Name: %s\n\n Num of files :%dir_pointer\n Dir size: %ld\n Max: %s\n Maxsize: %ld\n\n\n\n",direction_info_array[i].name,direction_info_array[i].countfiles,direction_info_array[i].sumsize,direction_info_array[i].max_file_name,direction_info_array[i].maxsize);
+        printf("Name: %s\n\n Num of files :%d\n Dir size: %ld\n Max: %s\n Maxsize: %ld\n\n\n\n",direction_info_array[i].name,direction_info_array[i].countfiles,direction_info_array[i].sumsize,direction_info_array[i].max_file_name,direction_info_array[i].maxsize);
         i++;
     }
 
 
 
-
     return 0;
-
-
 }
 
 
@@ -76,7 +86,6 @@ void show_dir_content(char *path)
 {
     DIR *dir_pointer = opendir(path);
     if (dir_pointer == NULL) return;
-
 
 
     struct dirent *direction;
@@ -107,6 +116,8 @@ void show_dir_content(char *path)
 direction_info get_dir_info(char *path, int index, direction_info *direction_info_array)
 {
 
+
+
     DIR *dir_pointer = opendir(path);
 
     if (dir_pointer==NULL)
@@ -114,9 +125,6 @@ direction_info get_dir_info(char *path, int index, direction_info *direction_inf
         printf("ERROR\n");
     }
 
-    //if (dir_pointer == NULL) return 1;
-
-    //direction_info *dir_info;
     struct dirent *direction;
 
 
@@ -131,16 +139,11 @@ direction_info get_dir_info(char *path, int index, direction_info *direction_inf
         //if its directory
         if ((direction->d_type == DT_DIR) && ((direction->d_name[0]!='.') || ((direction->d_name[0]!='.') && (direction->d_name[1]!='.'))))
         {
-              //printf("%s\n",direction->d_name);
-              char dir_path[NAMESIZE];
-              sprintf(dir_path,"%s/%s",path,direction->d_name);
-              strcpy(buff->name,dir_path);
-//            for(int i = 0; i < 256; i++)
-//            {
-//                (buff->name)[i]=dir_path[i];
-//            }
+            char dir_path[NAMESIZE];
+            sprintf(dir_path, "%s/%s", path, direction->d_name);
+            strcpy(buff->name, dir_path);
             index++;
-            direction_info_array[index] = get_dir_info(dir_path,index,direction_info_array);
+            direction_info_array[index] = get_dir_info(dir_path, index, direction_info_array);
         }
         else if (direction->d_type == DT_REG) //if it is file
         {
@@ -158,7 +161,7 @@ direction_info get_dir_info(char *path, int index, direction_info *direction_inf
 
             (buff->countfiles)++;
             (buff->sumsize)+=buffsize;
-            
+
         }
         else
         {
@@ -182,11 +185,32 @@ direction_info get_dir_info(char *path, int index, direction_info *direction_inf
 long get_file_info (char * filepath)
 {
     struct stat *filestat = malloc(sizeof(struct stat));
-
     stat(filepath,filestat);
-    //printf("%dir_pointer\n",filestat->st_size);
     return filestat->st_size;
 }
 
+
+// Print error message to temporary file err_log.
+void save_error_to_log(FILE *err_log, const char *program_name, const char *directory, const char *error_message)
+{
+    fprintf(err_log, "%s: %s: %s\n", program_name, directory, error_message);
+};
+
+// Print all error messages to stream stderr from temporary file err_log and remove the file.
+void print_error_log(FILE *err_log)
+{
+    fseek(err_log, 0, SEEK_SET);
+
+    int ch = fgetc(err_log);
+    while (ch != EOF)
+    {
+        fputc(ch, stderr);
+        ch = fgetc(err_log);
+    }
+
+    fclose(err_log);
+
+    remove(ERR_LOG_PATH);
+}
 
 
