@@ -26,7 +26,7 @@ void print_error_log(FILE *err_log);
 
 void show_dir_content(char *path);
 
-long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path);
+long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path,direction_info *buff);
 
 direction_info
 get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *err_log, char *program_name);
@@ -123,6 +123,10 @@ get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *
 
     while (direction = readdir(dir_pointer)) {
 
+
+
+
+
         //if its directory
         if ((direction->d_type == DT_DIR) &&
             ((direction->d_name[0] != '.') || ((direction->d_name[0] != '.') && (direction->d_name[1] != '.')))) {
@@ -135,7 +139,7 @@ get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *
         {
             char file_path[NAMESIZE];
             sprintf(file_path, "%s/%s", path, direction->d_name);
-            long buffsize = get_file_info(file_path, err_log, program_name, file_path);
+            long buffsize = get_file_info(file_path, err_log, program_name, file_path,buff);
 
 
             if (buffsize >= buff->maxsize) {
@@ -143,8 +147,7 @@ get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *
                 strcpy(buff->max_file_name, file_path);
             }
 
-            (buff->countfiles)++;
-            (buff->sumsize) += buffsize;
+
 
         } else {
             continue;
@@ -166,13 +169,63 @@ get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *
 }
 
 
+
+
+
+
+ino_t visited_inodes[NUM];
+int visited_inode_len = 0;
+
 //returns size of file in bytes
-long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path) {
+long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path,direction_info *buff) {
     struct stat *filestat = malloc(sizeof(struct stat));
+
 
     if (stat(filepath, filestat) == -1) {
         save_error_to_log(err_log, program_name, path, strerror(errno));
     }
+    
+    int is_in = 0;
+
+    //added check for inodes
+    if (filestat->st_nlink > 1)
+    {
+        // Array contains visited inodes numbers.
+        for (int i = 0; i < visited_inode_len; i++)
+        {
+            if (visited_inodes[i] == filestat->st_ino)
+            {
+                is_in = 1;
+            }
+        }
+
+
+        if (is_in)
+        {
+            return 0;
+        }
+        else
+        {
+            visited_inodes[visited_inode_len] = filestat->st_ino;
+            visited_inode_len++;
+
+            (buff->sumsize) += filestat->st_size;
+            (buff->countfiles)++;
+
+            return 0;
+        }
+
+    }
+
+
+
+    (buff->sumsize) += filestat->st_size;
+    (buff->countfiles)++;
+
+
+
+
+
     return filestat->st_size;
 }
 
@@ -229,5 +282,9 @@ void print_error_log(FILE *err_log) {
 //    }
 //    closedir(dir_pointer);
 //}
+
+
+
+
 
 
