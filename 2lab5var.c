@@ -8,16 +8,16 @@
 #include <libgen.h>
 #include <errno.h>
 
-#define NUM 1000
-#define NAMESIZE 1000
+//#define NUM 600
+#define NAMESIZE 600
 #define ERR_LOG_PATH "/tmp/err.log"
 
 typedef struct {
     int countfiles;
-    char name[NAMESIZE];
+    char *name;
     long int sumsize;
     long int maxsize;
-    char max_file_name[NAMESIZE];
+    char *max_file_name;
 } direction_info;
 
 void print_error_log(FILE *err_log);
@@ -28,11 +28,10 @@ void show_dir_content(char *path);
 
 long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path,direction_info *buff);
 
-direction_info
-get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *err_log, char *program_name);
+void get_dir_info(char *path, FILE *err_log,FILE *output, char *program_name);
+void print_direction(direction_info *buff, FILE *output);
 
-
-int main(int argc, char *argv[]) {
+    int main(int argc, char *argv[]) {
 
     char *program_name = basename(argv[0]);
 
@@ -56,42 +55,21 @@ int main(int argc, char *argv[]) {
         print_error_log(err_log);
         return 1;
     }
-    printf("\n\n\n");
-
     if (closedir(dir_pointer) == -1) {
         save_error_to_log(err_log, program_name, argv[1], strerror(errno));
         print_error_log(err_log);
         return 2;
     }
 
-
-    int index = 0;
-    direction_info direction_info_array[NUM];
-    direction_info_array[index] = get_dir_info(argv[1], index, direction_info_array, err_log, program_name);
-
+    //direction_info *direction_info_array = (direction_info *) malloc(sizeof(direction_info_array));
 
     FILE *output = NULL;
     if ((output = fopen(argv[2], "w+")) == NULL) {
         fprintf(stderr, "%s: Unable create output file (%s)\n", program_name, argv[2]);
         return 3;
     }
-
-    int i = 0;
-    for (int i = 0; i < NUM; i++) {
-
-        if (direction_info_array[i].name[0]) {
-            printf("Name: %s\n Num of files :%d\n Dir size: %ld\n Max: %s\n Maxsize: %ld\n\n",
-                   direction_info_array[i].name, direction_info_array[i].countfiles, direction_info_array[i].sumsize,
-                   direction_info_array[i].max_file_name, direction_info_array[i].maxsize);
-
-            fprintf(output, "Name: %s\n Num of files :%d\n Dir size: %ld\n Max: %s\n Maxsize: %ld\n\n",
-                    direction_info_array[i].name, direction_info_array[i].countfiles, direction_info_array[i].sumsize,
-                    direction_info_array[i].max_file_name, direction_info_array[i].maxsize);
-
-        }
-
-    }
-
+    //show_dir_content(argv[1]);
+    get_dir_info(argv[1], err_log,output, program_name);
 
     if (fclose(output) == EOF) {
         save_error_to_log(err_log, program_name, argv[2], strerror(errno));
@@ -101,17 +79,16 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-direction_info
-get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *err_log, char *program_name) {
-
+void get_dir_info(char *path, FILE *err_log,FILE *output, char *program_name) {
     struct dirent *direction;
 
-
     direction_info *buff = (direction_info *) malloc(sizeof(direction_info));
-    buff->sumsize = 0;
     buff->countfiles = 0;
+    buff->sumsize = 0;
     buff->maxsize = 0;
-
+    buff->max_file_name = NULL;
+    buff->name = (char*) malloc(sizeof(char) * (strlen(path) + 1));
+    sprintf(buff->name, "%s", path);
 
     DIR *dir_pointer = NULL;
 
@@ -120,71 +97,94 @@ get_dir_info(char *path, int index, direction_info *direction_info_array, FILE *
         return;
     }
 
+    while (direction = readdir(dir_pointer))
+    {
 
-    while (direction = readdir(dir_pointer)) {
-
-
-
-
-
-        //if its directory
-        if ((direction->d_type == DT_DIR) &&
-            ((direction->d_name[0] != '.') || ((direction->d_name[0] != '.') && (direction->d_name[1] != '.')))) {
-            char dir_path[NAMESIZE];
-            sprintf(dir_path, "%s/%s", path, direction->d_name);
-            strcpy(buff->name, dir_path);
-            index++;
-            direction_info_array[index] = get_dir_info(dir_path, index, direction_info_array, err_log, program_name);
-        } else if (direction->d_type == DT_REG) //if it is file
+        if ((strcmp(direction->d_name,".") == 0) || (strcmp(direction->d_name,"..") == 0))
         {
-            char file_path[NAMESIZE];
-            sprintf(file_path, "%s/%s", path, direction->d_name);
-            long buffsize = get_file_info(file_path, err_log, program_name, file_path,buff);
-
-
-            if (buffsize >= buff->maxsize) {
-                buff->maxsize = buffsize;
-                strcpy(buff->max_file_name, file_path);
-            }
-
-
-
-        } else {
             continue;
         }
 
+        char *dirpath = (char*) malloc(sizeof(char)*(strlen(path)+strlen(direction->d_name) + 2));
+        sprintf(dirpath, "%s/%s", path, direction->d_name);
+
+        //if its directory
+        if (direction->d_type == DT_DIR)
+        {
+            get_dir_info(dirpath,err_log,output,program_name);
+        }
+        else if(direction->d_type == DT_REG)
+        {
+            int buffsize = get_file_info(dirpath,err_log,program_name,path,buff);
+            if (buffsize >= buff->maxsize) {
+                buff->maxsize = buffsize;
+                //add max name
+                if (buff->max_file_name != NULL)
+                {
+                    free(buff->max_file_name);
+                }
+                buff->max_file_name = (char*) malloc(sizeof(char)*(strlen(dirpath) + 1));
+                sprintf(buff->max_file_name, "%s", dirpath);
+
+            }
+        }
+        else
+        {
+            continue;
+        }
+
+        free(dirpath);
+
 
     }
-
-
-    strcpy(buff->name, path);
-    fflush(stdout);
 
     if (closedir(dir_pointer) == -1) {
         save_error_to_log(err_log, program_name, path, strerror(errno));
         return;
     }
 
-    return *buff;
+    //if null give it empty string to print
+    if (buff->max_file_name == NULL)
+    {
+        buff->max_file_name = (char*) malloc(sizeof(char));
+        sprintf(buff->max_file_name, "");
+    }
+
+    print_direction(buff,output);
+    free(buff->name);
+    if (buff->max_file_name != NULL)
+    {
+        free(buff->max_file_name);
+    }
+    free(buff);
 }
 
 
+void print_direction(direction_info *buff, FILE *output)
+{
+
+    printf("%s %d %ld %s\n",
+           buff->name, buff->countfiles, buff->sumsize,
+           buff->max_file_name);
+
+    fprintf(output, "%s %d %ld %s\n",
+            buff->name, buff->countfiles, buff->sumsize,
+            buff->max_file_name);
+
+}
 
 
-
-
-ino_t visited_inodes[NUM];
+ino_t *visited_inodes = NULL;
 int visited_inode_len = 0;
 
 //returns size of file in bytes
 long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path,direction_info *buff) {
     struct stat *filestat = malloc(sizeof(struct stat));
 
-
     if (stat(filepath, filestat) == -1) {
         save_error_to_log(err_log, program_name, path, strerror(errno));
     }
-    
+
     int is_in = 0;
 
     //added check for inodes
@@ -206,6 +206,7 @@ long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path
         }
         else
         {
+            visited_inodes = (ino_t*) realloc(visited_inodes,sizeof(ino_t) * (visited_inode_len + 1));
             visited_inodes[visited_inode_len] = filestat->st_ino;
             visited_inode_len++;
 
@@ -217,23 +218,16 @@ long get_file_info(char *filepath, FILE *err_log, char *program_name, char *path
 
     }
 
-
-
     (buff->sumsize) += filestat->st_size;
     (buff->countfiles)++;
-
-
-
-
 
     return filestat->st_size;
 }
 
-
 // Print error message to temporary file err_log.
 void save_error_to_log(FILE *err_log, const char *program_name, const char *directory, const char *error_message) {
     fprintf(err_log, "%s: %s: %s\n", program_name, directory, error_message);
-};
+}
 
 // Print all error messages to stream stderr from temporary file err_log and remove the file.
 void print_error_log(FILE *err_log) {
@@ -250,41 +244,4 @@ void print_error_log(FILE *err_log) {
 
     remove(ERR_LOG_PATH);
 }
-
-//функция для красивого вывода директорий и файлов и их дифференциации
-//#define NORMAL_COLOR "\x1B[0m"
-//#define BLUE "\x1B[34m"
-//#define GREEN "\x1B[32m"
-//
-//
-//void show_dir_content(char *path) {
-//    DIR *dir_pointer = opendir(path);
-//    if (dir_pointer == NULL) return;
-//
-//
-//    struct dirent *direction;
-//    while (direction = readdir(dir_pointer)) {
-//
-//
-//        if ((direction->d_type == DT_DIR) && (strcmp(direction->d_name, ".") != 0) &&
-//            (strcmp(direction->d_name, "..") != 0)) {
-//
-//
-//            char dir_path[NAMESIZE];
-//            sprintf(dir_path, "%s/%s", path, direction->d_name);
-//            printf("%s%s/\n", GREEN, dir_path);
-//            show_dir_content(dir_path);
-//
-//
-//        } else if (direction->d_type == DT_REG) {
-//            printf("%s%s/%s\n", BLUE, path, direction->d_name);
-//        }
-//    }
-//    closedir(dir_pointer);
-//}
-
-
-
-
-
 
