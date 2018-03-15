@@ -7,9 +7,8 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <errno.h>
+#include <wait.h>
 
-//#define NUM 600
-#define NAMESIZE 600
 #define ERR_LOG_PATH "/tmp/err.log"
 
 typedef struct {
@@ -99,7 +98,6 @@ void get_dir_info(char *path, FILE *err_log,FILE *output, char *program_name) {
 
     while (direction = readdir(dir_pointer))
     {
-
         if ((strcmp(direction->d_name,".") == 0) || (strcmp(direction->d_name,"..") == 0))
         {
             continue;
@@ -134,9 +132,13 @@ void get_dir_info(char *path, FILE *err_log,FILE *output, char *program_name) {
         }
 
         free(dirpath);
-
-
     }
+
+    if (errno == EBADF)
+    {
+        save_error_to_log(err_log, program_name, path, strerror(errno));
+    }
+
 
     if (closedir(dir_pointer) == -1) {
         save_error_to_log(err_log, program_name, path, strerror(errno));
@@ -244,4 +246,3 @@ void print_error_log(FILE *err_log) {
 
     remove(ERR_LOG_PATH);
 }
-
