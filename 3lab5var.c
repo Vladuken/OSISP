@@ -19,7 +19,7 @@ void print_error_log(FILE *err_log);
 
 void get_file_info(char *filepath, FILE *err_log, char *program_name, char *path);
 
-void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_name);
+void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_name,const int num_of_process);
 void word_count(FILE *file, FILE *err_log, char *program_name, char* path);
 int main(int argc, char *argv[]) {
 
@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (argc != 3) {
-        save_error_to_log(err_log, program_name, "Wrong number of parameters. Usage", "./lab2.exe [pathname]");
+    if (argc != 4) {
+        save_error_to_log(err_log, program_name, "Wrong number of parameters. Usage", "./lab2.exe [pathname] [outfile] [N of files]");
         print_error_log(err_log);
         return 1;
     }
@@ -59,12 +59,20 @@ int main(int argc, char *argv[]) {
         return 3;
     }
     //show_dir_content(argv[1]);
-    recurcive_dir_pass(argv[1], err_log,output, program_name);
+
+    int max_process_num = atoi(argv[3]);
+    if (max_process_num <= 0)
+    {
+        fprintf(stderr, "%s: Bad N parameter.\n", program_name);
+        return 4;
+    }
+
+
+    recurcive_dir_pass(argv[1], err_log,output, program_name, atoi(argv[3]));
 
     if (fclose(output) == EOF) {
         save_error_to_log(err_log, program_name, argv[2], strerror(errno));
     }
-
     print_error_log(err_log);
     return 0;
 }
@@ -72,16 +80,18 @@ int main(int argc, char *argv[]) {
 
 
 
+int N = 0;
 //////////////////////////////////////////////////////////////////
-void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_name) {
+void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_name, const int num_of_process) {
     struct dirent *direction;
     DIR *dir_pointer = NULL;
 
-    if ((dir_pointer = opendir(path)) == NULL) {
-        save_error_to_log(err_log, program_name, path, strerror(errno));
+    if ((dir_pointer = opendir(path)) == NULL)
+    {
+        //fflush(stdout);
+        //save_error_to_log(err_log, program_name, path, strerror(errno));
         return;
     }
-
     while (direction = readdir(dir_pointer))
     {
         if ((strcmp(direction->d_name,".") == 0) || (strcmp(direction->d_name,"..") == 0))
@@ -95,7 +105,7 @@ void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_na
         //if its directory
         if (direction->d_type == DT_DIR)
         {
-            recurcive_dir_pass(dirpath,err_log,output,program_name);
+            recurcive_dir_pass(dirpath,err_log,output,program_name, num_of_process);
         }
         else if(direction->d_type == DT_REG)
         {
@@ -106,11 +116,18 @@ void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_na
         {
             continue;
         }
+
+
         free(dirpath);
+
     }
+
+
     if (errno == EBADF)
     {
         save_error_to_log(err_log, program_name, path, strerror(errno));
+        //errno = 0;
+        return;
     }
 
     if (closedir(dir_pointer) == -1) {
@@ -118,6 +135,7 @@ void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_na
         return;
     }
 }
+
 
 
 ino_t *visited_inodes = NULL;
@@ -128,12 +146,12 @@ void get_file_info(char *filepath, FILE *err_log, char *program_name, char *path
     struct stat *filestat = malloc(sizeof(struct stat));
 
     if (stat(filepath, filestat) == -1) {
-        save_error_to_log(err_log, program_name, path, strerror(errno));
+        free(filestat);
+        //save_error_to_log(err_log, program_name, path, strerror(errno));
+        return;
     }
 
     int is_in = 0;
-
-
 
     //added check for inodes
     if (filestat->st_nlink > 1)
@@ -146,7 +164,6 @@ void get_file_info(char *filepath, FILE *err_log, char *program_name, char *path
                 is_in = 1;
             }
         }
-
 
         if (is_in)
         {
@@ -168,6 +185,7 @@ void get_file_info(char *filepath, FILE *err_log, char *program_name, char *path
     } else if(filestat->st_nlink == 1)
     {
         open_file_and_wc(filepath,err_log,program_name);
+        return;
     }
 }
 
@@ -179,16 +197,13 @@ void open_file_and_wc(char * path, FILE *err_log, char *program_name)
         save_error_to_log(err_log, program_name, path, strerror(errno));
         return;
     }
-    printf("%d %s ",getpid(), path);
-
     word_count(file,err_log,program_name, path);
-
-
+    return;
 }
 
 void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
 {
-    char *locale = setlocale(LC_ALL, "");
+    setlocale(LC_ALL, "");
     wint_t c;
     unsigned long long countchars = 0;
     unsigned long long countwords = 0;
@@ -197,8 +212,19 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
 
     short inword = 0;
     //count chars in file
-    while (((c = fgetwc(file)) != WEOF))
+    do
     {
+        c = fgetwc(file);
+        if ((c == WEOF) && (errno == EILSEQ))
+        {
+            errno = 0;
+            c = getc(file);
+
+        }
+        else if (c == WEOF)
+        {
+            break;
+        }
         countchars++;
         switch (c)
         {
@@ -218,7 +244,9 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
                 inword = 1;
                 break;
         }
-    }
+
+    } while (c != WEOF);
+
 //////////////////////////////////////////////////
     if (errno == EILSEQ)
     {
@@ -231,12 +259,18 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
 //        printf("AAAAAAAAAAAAAAAA");
 //        errno = 0;
 //    }
-    printf("%lld %lld\n", countchars,countwords);
+    //printf(, N);
+    //printf("%d %s ",getpid(), path);
+    printf("%d %d %s %lld %lld\n",N, getpid(),path,countchars,countwords);
 }
 
 // Print error message to temporary file err_log.
 void save_error_to_log(FILE *err_log, const char *program_name, const char *directory, const char *error_message) {
-    fprintf(err_log, "%s: %s: %s\n", program_name, directory, error_message);
+
+//    printf("%d o\n",getpid());
+
+    fprintf(err_log, "%d N:%d  %s: %s: %s\n", getpid(),N,program_name, directory, error_message);
+    return;
 }
 
 // Print all error messages to stream stderr from temporary file err_log and remove the file.
