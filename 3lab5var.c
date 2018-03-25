@@ -13,7 +13,7 @@
 
 #define ERR_LOG_PATH "/tmp/err.log"
 
-void print_error_log(FILE *err_log);
+int count_processes,max_processes;
 
 void print_error_log(FILE *err_log);
 
@@ -21,6 +21,7 @@ void get_file_info(char *filepath, FILE *err_log, char *program_name, char *path
 
 void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_name,const int num_of_process);
 void word_count(FILE *file, FILE *err_log, char *program_name, char* path);
+
 int main(int argc, char *argv[]) {
 
     char *program_name = basename(argv[0]);
@@ -60,15 +61,27 @@ int main(int argc, char *argv[]) {
     }
     //show_dir_content(argv[1]);
 
-    int max_process_num = atoi(argv[3]);
-    if (max_process_num <= 0)
+    max_processes = atoi(argv[3]);
+    if (max_processes <= 0)
     {
         fprintf(stderr, "%s: Bad N parameter.\n", program_name);
         return 4;
     }
 
-
     recurcive_dir_pass(argv[1], err_log,output, program_name, atoi(argv[3]));
+
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    int status;
+    while (count_processes > 0) {
+        //printf("Num of processes running - %d\n", count_processes);
+        wait(&status);
+        count_processes--;
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
     if (fclose(output) == EOF) {
         save_error_to_log(err_log, program_name, argv[2], strerror(errno));
@@ -109,7 +122,24 @@ void recurcive_dir_pass(char *path, FILE *err_log,FILE *output, char *program_na
         }
         else if(direction->d_type == DT_REG)
         {
-            get_file_info(dirpath,err_log,program_name,path);
+
+            int status;
+            while (count_processes >= max_processes) {
+                wait(&status);
+                count_processes--;
+            }
+            //Make a child process
+            count_processes++;
+            //printf("Count of processes is %d\n", count_processes);
+            pid_t pid;
+            pid = fork();
+
+            //If it's a child process then we start work
+            if (0 == pid) {
+                get_file_info(dirpath,err_log,program_name,path);
+                exit(0);
+            }
+
             //function to work with files
         }
         else
@@ -261,7 +291,7 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
 //    }
     //printf(, N);
     //printf("%d %s ",getpid(), path);
-    printf("%d %d %s %lld %lld\n",N, getpid(),path,countchars,countwords);
+    printf("%d %d %s %lld %lld\n",count_processes, getpid(),path,countchars,countwords);
 }
 
 // Print error message to temporary file err_log.
