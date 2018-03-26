@@ -234,11 +234,21 @@ void open_file_and_wc(char * path, FILE *err_log, char *program_name)
 void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
 {
     setlocale(LC_ALL, "");
-    wint_t c;
+    wchar_t c;
     unsigned long long countchars = 0;
     unsigned long long countwords = 0;
-    unsigned long long bytes = 0;
+    unsigned long long countbytes = 0;
 
+
+    //
+    struct stat st;
+    if (stat(path, &st) == -1) {
+        perror("stat");
+    }
+    else {
+        countbytes = (unsigned long long) st.st_size ;
+    }
+    //
 
     short inword = 0;
     //count chars in file
@@ -248,11 +258,12 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
         if ((c == WEOF) && (errno == EILSEQ))
         {
             errno = 0;
-            c = getc(file);
+            c = fgetc(file);
 
         }
         else if (c == WEOF)
         {
+            //printf("A\n");
             break;
         }
         countchars++;
@@ -291,7 +302,10 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
 //    }
     //printf(, N);
     //printf("%d %s ",getpid(), path);
-    printf("%d %d %s %lld %lld\n",count_processes, getpid(),path,countchars,countwords);
+    //printf("%d %d %s %lld %lld\n",count_processes, getpid(),path,countchars,countwords);
+    //printf("%d %s %lld %lld %lld\n",getpid(),path,countchars,countwords,countbytes);
+    printf("%d %s %lld %lld\n",getpid(),path,countbytes,countwords);
+
 }
 
 // Print error message to temporary file err_log.
@@ -299,7 +313,7 @@ void save_error_to_log(FILE *err_log, const char *program_name, const char *dire
 
 //    printf("%d o\n",getpid());
 
-    fprintf(err_log, "%d N:%d  %s: %s: %s\n", getpid(),N,program_name, directory, error_message);
+    fprintf(err_log, "%d %s: %s: %s\n", getpid(),program_name, directory, error_message);
     return;
 }
 
