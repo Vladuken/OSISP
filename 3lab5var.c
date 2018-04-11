@@ -10,6 +10,7 @@
 #include <wait.h>
 #include <locale.h>
 #include <wchar.h>
+#include <ctype.h>
 
 #define ERR_LOG_PATH "/tmp/err.log"
 
@@ -257,9 +258,9 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
         c = fgetwc(file);
         if ((c == WEOF) && (errno == EILSEQ))
         {
+            //printf("---------------%s\n",path);
             errno = 0;
             c = fgetc(file);
-
         }
         else if (c == WEOF)
         {
@@ -306,6 +307,28 @@ void word_count(FILE *file, FILE *err_log, char *program_name,char * path)
     //printf("%d %s %lld %lld %lld\n",getpid(),path,countchars,countwords,countbytes);
     printf("%d %s %lld %lld\n",getpid(),path,countbytes,countwords);
 
+}
+
+
+
+int issep(wchar_t c)
+{
+    switch (c)
+    {
+        case '\n':
+            return 1;
+        case '\r':
+            return 1;
+        case '\f':
+            return 1;
+        case '\t':
+            return 1;
+        case ' ':
+            return 1;
+        case '\v':
+            return 1;
+    }
+    return 0;
 }
 
 // Print error message to temporary file err_log.
